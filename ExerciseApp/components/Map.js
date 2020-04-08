@@ -1,14 +1,32 @@
 import React, { Component } from 'react';
 import { StyleSheet, Text, View, Dimensions, TouchableOpacity, Alert, YellowBox, ActivityIndicator, Platform, PermissionsAndroid } from 'react-native';
 import { db } from './common/config';
+import firebase from 'firebase';
 import MapView, { PROVIDER_GOOGLE, Marker, Polygon, Callout, Polyline, AnimatedRegion } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import Workout from './Workout';
 import haversine from 'haversine';
+import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
+import RNSimpleNativeGeofencing from 'react-native-simple-native-geofencing';
 
 YellowBox.ignoreWarnings(['Setting a timer']);
 YellowBox.ignoreWarnings(['MapViewDirections']);
 YellowBox.ignoreWarnings(['react-native-maps-directions']);
+YellowBox.ignoreWarnings(['Accessing view manager configs']);
+
+// TaskManager.defineTask('Collect Marker', ({ data: { eventType, region }, error }) => {
+//   console.log('im here');
+//   if (error) {
+//     console.log(error);
+//     return;
+//   }
+//   if (eventType === Location.GeofencingEventType.Enter) {
+//     console.log("You've entered region:", region);
+//   } else if (eventType === Location.GeofencingEventType.Exit) {
+//     console.log("You've left region:", region);
+//   }
+// });
 
 const { width, height } = Dimensions.get('window');
 const GOOGLE_MAPS_APIKEY = 'AIzaSyCbxmLQIQys2IrnNpfj1xlhIwxNXgrDNvs';
@@ -16,7 +34,6 @@ const GOOGLE_MAPS_APIKEY = 'AIzaSyCbxmLQIQys2IrnNpfj1xlhIwxNXgrDNvs';
 class Map extends Component {
   constructor(props) {
     super(props);
-
     this.state = {
       mapRegion: {
         latitude: 0,
@@ -37,6 +54,7 @@ class Map extends Component {
       prevLatLng: {},
       distance: 0, // The distance between current location to Marker which is user taped on
       duration: 0, // The duration relative distance
+      timerOn: false, //User has stated a timer 
       region1: [
         { latitude: -45.808612, longitude: 170.520680 },
         { latitude: -45.836839, longitude: 170.588894 },
@@ -79,6 +97,8 @@ class Map extends Component {
     };
 
     this.mapView = null;
+    // set interTime as a calss member just for when stop exercise could stop watch position
+    this.interTime = null;
     this.workout = React.createRef();
   }
 
@@ -89,6 +109,40 @@ class Map extends Component {
 
   componentDidMount() {
     this.setState({ loading: true });
+
+    // var notificationSetting = {
+    //   start: {
+    //     notify: true,
+    //     title: "Start Tracking",
+    //     description: "You are now tracked"
+    //   },
+    //   stop: {
+    //     notify: true,
+    //     title: "Stopped Tracking",
+    //     description: "You are not tracked any longer"
+    //   },
+    //   timeout: {         
+    //     notify: false,
+    //     title: 'Time Out',
+    //     description: 'The geofencing tracking has timed out'
+    //   },
+    //   enter: {
+    //     notify: true,
+    //     title: "Attention",
+    //     description: "You entered a zone"
+    //   },
+    //   exit: {
+    //     notify: true,
+    //     title: "Left Zone",
+    //     description: "You left a zone"
+    //   },
+    //   channel: {
+    //     title: "Message Channel Title",
+    //     description: "Message Channel Description"
+    //   }
+    // }
+    // console.log(notificationSetting)
+    // RNSimpleNativeGeofencing.initNotification(notificationSetting);
 
     db.ref('runningLocation')
       .on('value', (data) => {
@@ -118,40 +172,10 @@ class Map extends Component {
           {
             enableHighAccuracy: true,
           })
-
-        // navigator.geolocation.watchPosition(position => {
-        //   this.setState({
-        //     mapRegion: {
-        //       latitude: position.coords.latitude,
-        //       longitude: position.coords.longitude,
-        //       latitudeDelta: 0.0922,
-        //       longitudeDelta: 0.0422
-        //     },
-        //     wayPoints: [
-        //       ...this.state.wayPoints,
-        //       {
-        //         latitude: position.coords.latitude,
-        //         longitude: position.coords.longitude
-        //       }
-        //     ],
-        //   });
-        //   this.checkUserInGeofence();
-        // }, (error) => {
-        //   console.log(error)
-        // }, {
-        //     enableHighAccuracy: true,
-        //     timeout: 20000,
-        //     maximumAge: 1000,
-        //     distanceFilter: 10
-        //   });
       }, (error) => {
         console.log("There was an error retrieving the data");
         console.log(error);
       });
-  }
-
-  componentWillUnmount() {
-    navigator.geolocation.clearWatch(this.watchID);
   }
 
   isInPolygon(point, polygonArray) {
@@ -171,35 +195,40 @@ class Map extends Component {
     return inside
   }
 
-  getAllMarkers() {
+  getSelectedMarker() {
     return (
-      this.state.markers.map((marker) => (
-        <Marker coordinate={{
-          latitude: marker.latitude,
-          longitude: marker.longitude
-        }}
-          title={marker.title}
-          key={marker.key}
-          onPress={(e) => {
-            this.setState({
-              tapedMarkerCoords: e.nativeEvent.coordinate,
-              selectedMarker: marker.title,
-            });
-          }}
-        >
-          {/* <Callout>
-            <View>
-              <Text>
-                {this.state.directionMode}{'\n'}
-                Destination: {marker.title}{'\n'}
-                Distance:  {(this.state.distance).toFixed(2)} km{'\n'}
-                Duration: {Math.round(this.state.duration)} min
-              </Text>
-            </View>
-          </Callout> */}
-        </Marker >
-      ))
+      <Marker coordinate={{
+        latitude: this.state.selectedMarker.latitude,
+        longitude: this.state.selectedMarker.longitude
+      }}
+        title={this.state.selectedMarker.title}
+        key={this.state.selectedMarker.key}
+      />
     );
+  }
+
+  getAllMarkers() {
+    if (this.state.timerOn) {
+      return this.getSelectedMarker();
+    } else {
+      return (
+        this.state.markers.map((marker) => (
+          <Marker coordinate={{
+            latitude: marker.latitude,
+            longitude: marker.longitude
+          }}
+            title={marker.title}
+            key={marker.key}
+            onPress={(e) => {
+              this.setState({
+                tapedMarkerCoords: e.nativeEvent.coordinate,
+                selectedMarker: marker
+              });
+            }}
+          />
+        ))
+      );
+    }
   }
 
   checkMarkerInGeofence(region) {
@@ -315,51 +344,117 @@ class Map extends Component {
     this.setState({ directionMode: m });
   }
 
+  getWeight() {
+    weight = 0;
+    db.ref('/users/' + firebase.auth().currentUser.uid).on('value', (snapshot) => {
+      let userObj = snapshot.val();
+      if (userObj.weight != null) {
+        weight = userObj.weight;
+      }
+    })
+    return weight;
+  }
+
+  // when user press stop button 
+  // reset all state to initial state
+  resetDistanceTravelledCallback = (directionMode, realDuration, calories) => {
+    // this.fitToScreen(2000, 0.0922, 0.0422);
+
+    let ts = Date.now();
+    let date_ob = new Date(ts);
+    let date = date_ob.getDate();
+    let month = date_ob.getMonth() + 1;
+    let year = date_ob.getFullYear();
+    let doneTime = year + "-" + month + "-" + date
+
+    db.ref('/records/' + firebase.auth().currentUser.uid + '/' + new Date().getTime()).set({
+      directionMode: directionMode,
+      doneTime: doneTime,
+      realDuration: realDuration,
+      finalDistance: this.state.distanceTravelled,
+      calories: calories,
+      markerBadge: this.state.selectedMarker.title
+    });
+
+    this.setState({
+      distanceTravelled: 0,
+      distance: 0,
+      duration: 0,
+      tapedMarkerCoords: { latitude: 0, longitude: 0 },
+      routingCoordinates: [],
+      selectedMarker: ''
+    })
+
+    navigator.geolocation.clearWatch(this.watchID);
+  }
+
   // tracking routing and record coordinates and show the line on map
   setIsStartCallback = (status) => {
     if (status === true) {
-      // fit to current location with 0.05 delta zool range
-      this.mapView.animateToRegion({
-        latitude: this.state.mapRegion.latitude,
-        longitude: this.state.mapRegion.longitude,
-        latitudeDelta: 0.005,
-        longitudeDelta: 0.005
-      });
-      setInterval(() => {
+      // this.fitToScreen(1, 0.0037, 0.0013);
+      this.interTime = setInterval(() => {
         //start track routing
-        this.watchID = navigator.geolocation.watchPosition(position => {
-          const { distanceTravelled } = this.state;
-          const { latitude, longitude } = position.coords;
-          const newCoordinate = {
-            latitude,
-            longitude
-          };
-
-          this.setState({
-            // routingCoordinates: routingCoordinates.concat([newCoordinate]),
-            routingCoordinates: [
-              ...this.state.routingCoordinates,
-              {
-                latitude,
-                longitude,
-              }
-            ],
-            distanceTravelled:
-              distanceTravelled + this.calcDistance(newCoordinate),
-            prevLatLng: newCoordinate,
-          });
-
-        }, (error) => {
-          console.log(error)
-        }, {
-            enableHighAccuracy: true,
-            distanceFilter: 20
-          });
+        this.watchPosition();
       }, 10000); // check position each 10 senconds
-
+    } else {
+      // clear the internal time to stop watching
+      clearInterval(this.interTime);
+      navigator.geolocation.clearWatch(this.watchID);
+      this.watchID = null;
+      // this.fitToScreen(2000, 0.0922, 0.0422);
     }
   }
 
+  watchPosition() {
+    this.watchID = navigator.geolocation.watchPosition(position => {
+      const { distanceTravelled } = this.state;
+      const { latitude, longitude } = position.coords;
+      const newCoordinate = {
+        latitude,
+        longitude
+      };
+      
+      this.setState({
+        // routingCoordinates: routingCoordinates.concat([newCoordinate]),
+        routingCoordinates: [
+          ...this.state.routingCoordinates,
+          {
+            latitude,
+            longitude,
+          }
+        ],
+        distanceTravelled:
+          distanceTravelled + this.calcDistance(newCoordinate),
+        prevLatLng: newCoordinate,
+      });
+      // this.fitToScreen(1, 0.0037, 0.0013);
+    }, (error) => {
+      console.log(error)
+    }, {
+      enableHighAccuracy: true,
+      distanceFilter: 20
+    });
+  }
+
+  // fit to current location with the delta value
+  // accept parameter is animation time, default: 2000
+  // x: the value of latitude Delta
+  // y: the vlaue fo longitude Delta
+  fitToScreen(t, x, y) {
+    this.mapView.animateToRegion({
+      latitude: this.state.mapRegion.latitude,
+      longitude: this.state.mapRegion.longitude,
+      latitudeDelta: x,
+      longitudeDelta: y
+    }, t);
+  }
+
+  //call back method to pass data from child to parent
+  setTimerOn = (childData) => {
+    this.setState({
+      timerOn: childData
+    });
+  }
 
   render() {
     if (!this.state.loading) {
@@ -374,21 +469,7 @@ class Map extends Component {
               zoomControlEnabled={true}
               showsUserLocation={true}
               showsMyLocationButton={true}
-            // onUserLocationChange={(location) => {
-            //   const { distanceTravelled } = this.state;
-            //   const { latitude, longitude } = location.nativeEvent.coordinate;
-            //   const newCoordinate = { latitude, longitude };
-            //   this.setState({
-            //     routingCoordinates: [
-            //       ...this.state.routingCoordinates,
-            //       { latitude, longitude }
-            //     ],
-            //     distanceTravelled: distanceTravelled + this.calcDistance(newCoordinate),
-            //     prevLatLng: newCoordinate,
-            //   });
-            // }}
             >
-              {this.getAllMarkers()}
               <Polygon coordinates={this.state.region1} fillColor="rgba(252, 3, 3, 0.3)" />
               <Polygon coordinates={this.state.region2} fillColor="rgba(3, 19, 252, 0.3)" />
               <Polygon coordinates={this.state.region3} fillColor="rgba(64, 191, 33, 0.3)" />
@@ -398,7 +479,7 @@ class Map extends Component {
                 destination={this.state.tapedMarkerCoords}
                 waypoints={(this.state.wayPoints.length > 2) ? this.state.wayPoints.slice(1, -1) : null}
                 apikey={GOOGLE_MAPS_APIKEY}
-                mode={this.state.directionMode}
+                mode={this.state.directionMode === 'RUNNING' ? 'WALKING' : this.state.directionMode}
                 strokeWidth={3}
                 strokeColor="blue"
                 onStart={(params) => {
@@ -409,7 +490,7 @@ class Map extends Component {
                   this.setState({ distance: result.distance, duration: result.duration });
                   // call workout subcomponent function to update the estimate information
                   // Target: marker name, Distance: estimate distance, Duration: estimate duration from current location to target
-                  this.workout.current.setEstimateInfo(this.state.distance, this.state.duration, this.state.selectedMarker);
+                  this.workout.current.setEstimateInfo(this.state.distance, this.state.duration, this.state.selectedMarker.title);
 
                   this.mapView.fitToCoordinates(result.coordinates, {
                     edgePadding: {
@@ -425,6 +506,7 @@ class Map extends Component {
                 }} >
               </MapViewDirections>
               <Polyline coordinates={this.state.routingCoordinates} strokeColor='pink' strokeWidth={5}></Polyline>
+              {this.getAllMarkers()}
               {this.getCustomMarkers()}
             </MapView>
           </View>
@@ -434,7 +516,9 @@ class Map extends Component {
               mapDirectionsModeCallback={this.setDirectionsModeCallback}
               distanceTravelled={this.state.distanceTravelled}
               isStartCallback={this.setIsStartCallback}
-              selectedMarker={this.state.selectedMarker}
+              selectedMarker={this.state.selectedMarker.title}
+              timerOnCallback={this.setTimerOn}
+              resetDistanceTravelled={this.resetDistanceTravelledCallback}
             />
           </View>
         </View >
@@ -480,7 +564,7 @@ const styles = StyleSheet.create({
     borderRadius: 100 / 2,
     alignItems: 'center',
     justifyContent: 'center',
-},
+  },
 });
 
 export default Map

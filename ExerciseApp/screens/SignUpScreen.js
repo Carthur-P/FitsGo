@@ -40,7 +40,7 @@ class SignUpScreen extends Component {
         }
 
         let reg = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
-        if (reg.test(email) === false) {
+        if (reg.test(email) == false) {
             this.setState({ error: 'Email Address invalid!' });
             return false;
         }
@@ -92,7 +92,15 @@ class SignUpScreen extends Component {
             lastName: lastName,
             gender: gender,
             weight: weight,
-            birthday, birthday
+            birthday, birthday,
+            iconUrl: 'https://firebasestorage.googleapis.com/v0/b/bitexercise.appspot.com/o/icons%2Fuser-icon-image-placeholder.jpg?alt=media&token=91d6ca81-42b5-462b-b87a-149343efe460'
+        });
+        db.ref('/records/' + firebase.auth().currentUser.uid + '/' + new Date().getTime()).set({
+            directionMode: '',
+            doneTime: '',
+            realDuration: '',
+            finalDistance: '',
+            calories: ''
         });
     }
 
@@ -116,7 +124,7 @@ class SignUpScreen extends Component {
     }
 
     render() {
-        
+
         return (
             <View>
                 <Header
@@ -173,11 +181,21 @@ class SignUpScreen extends Component {
                         {this.renderButton()}
                     </CardSection>
                     <CardSection >
+
                         <TouchableOpacity style={styles.signUpContainer} onPress={() => this.props.navigation.navigate('SignIn')}>
                             <Text style={{ marginVertical: 15 }}>Already have an account?  <Text style={{ color: 'blue' }}>Log in</Text></Text>
                         </TouchableOpacity>
+
+
                     </CardSection>
+
                 </Card>
+                <View style={{ alignItems: 'center', marginTop: 15 }}>
+                    <TouchableOpacity onPress={() => this.props.navigation.navigate('PrivacyPolicy')}>
+                        <Text style={{ color: 'blue' }}>Privacy Policy</Text>
+                    </TouchableOpacity>
+                </View>
+
             </View>
         )
     }
@@ -192,7 +210,7 @@ styles = StyleSheet.create({
         marginBottom: 10,
         backgroundColor: '#f26b6b',
         paddingHorizontal: 30,
-        paddingVertical:5
+        paddingVertical: 5
     },
     signUpContainer: {
         flex: 1,

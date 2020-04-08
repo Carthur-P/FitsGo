@@ -12,32 +12,19 @@ import DateTimePicker from "react-native-modal-datetime-picker";
 export default class ProfileScreen extends Component {
     constructor(props) {
         super(props);
+        this.state = {
+            firstName: '',
+            lastName: '',
+            gender: '',
+            maleSelected: false,
+            femaleSelected: false,
+            weight: 0,
+            isDateTimePickerVisible: false,
+            birthday: '',
+        };
     }
 
-    state = {
-        firstName: '',
-        lastName: '',
-        gender: '',
-        maleSelected: false,
-        femaleSelected: false,
-        weight: 0,
-        isDateTimePickerVisible: false,
-        birthday: '',
-        user: '',
-        loading:false,
-    };
-
     componentWillMount() {
-        this.setState({ loading: true });
-
-        firebase.auth().onAuthStateChanged((user) => {
-            if (user) {
-                this.setState({ user: user });
-            } else {
-                this.props.navigation.navigate('SignIn');
-            }
-        });
-
         currentUser = db.ref('/users/' + firebase.auth().currentUser.uid).on('value', (snapshot) => {
             let userObj = snapshot.val();
             if (userObj != null) {
@@ -55,8 +42,6 @@ export default class ProfileScreen extends Component {
                 }
             }
         })
-
-        this.setState({ loading: false });
     }
 
     showDateTimePicker = () => {
@@ -84,107 +69,98 @@ export default class ProfileScreen extends Component {
     handleSave() {
         const { firstName, lastName, gender, weight, birthday } = this.state;
         db.ref('/users/' + firebase.auth().currentUser.uid)
-            .update({
-                firstName,
-                lastName,
-                gender,
-                weight,
-                birthday
-            })
-            .then((res) => {
-                Alert.alert('Profile has been saved.');
-                this.props.navigation.navigate('Porfile');
-            })
+        .update({
+            firstName,
+            lastName,
+            gender,
+            weight,
+            birthday
+        })
+        .then(() => {
+            Alert.alert('Profile has been saved.');
+            this.props.navigation.navigate('Home');
+        })
     }
 
     render() {
-        if (!this.state.loading) {
-            return (
-                <View>
-                    <Header
-                        leftComponent={<AntDesign name="arrowleft" onPress={() => this.props.navigation.goBack()} size={32} color="white" />}
-                        centerComponent={{ text: "Profile", style: { color: '#FFF', fontSize: 25 } }} />
-                    <Card>
-                        <CardSection>
-                            <Input
-                                placeholder="First Name"
-                                label="First Name"
-                                value={this.state.firstName}
-                                onChangeText={firstName => this.setState({ firstName })}
-                            ></Input>
-                        </CardSection>
-                        <CardSection>
-                            <Input
-                                placeholder="Last Name"
-                                label="Last Name"
-                                value={this.state.lastName}
-                                onChangeText={lastName => this.setState({ lastName })}
-                            ></Input>
-                        </CardSection>
-                        <CardSection>
-                            <View style={styles.containerStyle}>
-                                <Text style={styles.labelStyle}>Gender</Text>
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        this.setState({ gender: 'Male', maleSelected: true, femaleSelected: false });
-                                    }}
-                                >
-                                    <FontAwesome style={styles.genderSpace} name='male' size={35} color={this.state.maleSelected ? '#48cfad' : '#000000'} />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        this.setState({ gender: 'Female', femaleSelected: true, maleSelected: false });
-                                    }}
-                                >
-                                    <FontAwesome style={styles.genderSpace} name='female' size={35} color={this.state.femaleSelected ? '#48cfad' : '#000000'} />
-                                </TouchableOpacity>
-                                <Text style={{ fontSize: 12, flex: 1, textAlign: "right" }}>{this.state.gender}</Text>
-                            </View>
-                        </CardSection>
-                        <CardSection>
-                            <View style={styles.containerStyle}>
-                                <Text style={styles.labelStyle}>Weight</Text>
-                                <Slider
-                                    style={styles.slider}
-                                    step={1}
-                                    minimumValue={10}
-                                    maximumValue={250}
-                                    onValueChange={this.handSliderChange.bind(this)}
-                                    value={parseFloat(this.state.weight)}
-                                />
-                                <Text style={{ fontSize: 12, flex: 1, textAlign: "right" }}>{String(this.state.weight)}KG</Text>
-                            </View>
-                        </CardSection>
-                        <CardSection>
-                            <View style={styles.containerStyle}>
-                                <Text style={styles.labelStyle}>Birthday</Text>
-                                <Text style={{ fontSize: 16, width: 120, flex: 3, textAlign: 'center' }}>{String(this.state.birthday)}</Text>
-                                <Foundation size={37} style={{ flex: 1, textAlign: "right" }} color='#48cfad' name='calendar' onPress={this.showDateTimePicker}></Foundation>
-                            </View>
-                        </CardSection>
-                        <DateTimePicker
-                            mode='date'
-                            datePickerModeAndroid='spinner'
-                            isVisible={this.state.isDateTimePickerVisible}
-                            onConfirm={this.handleDatePicked}
-                            onCancel={this.hideDateTimePicker}
-                        />
-                        <CardSection>
-                            <MyButton
-                                onPress={this.handleSave.bind(this)}>Save
+        return (
+            <View>
+                <Header
+                    leftComponent={<AntDesign name="arrowleft" onPress={() => this.props.navigation.navigate('Home')} size={32} color="white" />}
+                    centerComponent={{ text: "Profile", style: { color: '#FFF', fontSize: 25 } }} />
+                <Card>
+                    <CardSection>
+                        <Input
+                            placeholder="First Name"
+                            label="First Name"
+                            value={this.state.firstName}
+                            onChangeText={firstName => this.setState({ firstName })}
+                        ></Input>
+                    </CardSection>
+                    <CardSection>
+                        <Input
+                            placeholder="Last Name"
+                            label="Last Name"
+                            value={this.state.lastName}
+                            onChangeText={lastName => this.setState({ lastName })}
+                        ></Input>
+                    </CardSection>
+                    <CardSection>
+                        <View style={styles.containerStyle}>
+                            <Text style={styles.labelStyle}>Gender</Text>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    this.setState({ gender: 'Male', maleSelected: true, femaleSelected: false });
+                                }}
+                            >
+                                <FontAwesome style={styles.genderSpace} name='male' size={35} color={this.state.maleSelected ? '#48cfad' : '#000000'} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    this.setState({ gender: 'Female', femaleSelected: true, maleSelected: false });
+                                }}
+                            >
+                                <FontAwesome style={styles.genderSpace} name='female' size={35} color={this.state.femaleSelected ? '#48cfad' : '#000000'} />
+                            </TouchableOpacity>
+                            <Text style={{ fontSize: 12, flex: 1, textAlign: "right" }}>{this.state.gender}</Text>
+                        </View>
+                    </CardSection>
+                    <CardSection>
+                        <View style={styles.containerStyle}>
+                            <Text style={styles.labelStyle}>Weight</Text>
+                            <Slider
+                                style={styles.slider}
+                                step={1}
+                                minimumValue={10}
+                                maximumValue={250}
+                                onValueChange={this.handSliderChange.bind(this)}
+                                value={parseFloat(this.state.weight)}
+                            />
+                            <Text style={{ fontSize: 12, flex: 1, textAlign: "right" }}>{String(this.state.weight)}KG</Text>
+                        </View>
+                    </CardSection>
+                    <CardSection>
+                        <View style={styles.containerStyle}>
+                            <Text style={styles.labelStyle}>Birthday</Text>
+                            <Text style={{ fontSize: 16, width: 120, flex: 3, textAlign: 'center' }}>{String(this.state.birthday)}</Text>
+                            <Foundation size={37} style={{ flex: 1, textAlign: "right" }} color='#48cfad' name='calendar' onPress={this.showDateTimePicker}></Foundation>
+                        </View>
+                    </CardSection>
+                    <DateTimePicker
+                        mode='date'
+                        datePickerModeAndroid='spinner'
+                        isVisible={this.state.isDateTimePickerVisible}
+                        onConfirm={this.handleDatePicked}
+                        onCancel={this.hideDateTimePicker}
+                    />
+                    <CardSection>
+                        <MyButton
+                            onPress={this.handleSave.bind(this)}>Save
                         </MyButton>
-                        </CardSection>
-                    </Card>
-                </View>
-            )
-        }
-        else {
-            return (
-                <View style={styles.loading}>
-                    <ActivityIndicator size="large" />
-                </View>
-            );
-        }
+                    </CardSection>
+                </Card>
+            </View>
+        )
     }
 }
 

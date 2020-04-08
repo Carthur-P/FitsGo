@@ -8,17 +8,21 @@ import ProfileScreen from './screens/ProfileScreen';
 import MyRecordsScreen from './screens/MyRecordsScreen';
 import Icon from './screens/Icon';
 import Account from './screens/Account';
+import ResetPassword from './screens/ResetPassword';
+import PrivacyPolicy from './screens/PrivacyPolicy'
 
 const navigator = createStackNavigator({
-    Loading: LoadingScreen,
-    SignIn: SignInScreen,
-    Home: HomeScreen,
-    SignUp: SignUpScreen,
-    Profile: ProfileScreen,
-    MyRecords: MyRecordsScreen,
-    Icon: Icon,
-    Account: Account,
-  },
+  Loading: LoadingScreen,
+  SignIn: SignInScreen,
+  Home: HomeScreen,
+  SignUp: SignUpScreen,
+  Profile: ProfileScreen,
+  MyRecords: MyRecordsScreen,
+  Icon: Icon,
+  Account: Account,
+  ResetPassword: ResetPassword,
+  PrivacyPolicy: PrivacyPolicy
+},
   {
     defaultNavigationOptions: {
       headerMode: 'none',

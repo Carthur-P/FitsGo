@@ -16,7 +16,7 @@ export default class Icon extends Component {
     }
 
     state = {
-        sourceImg: '',
+        sourceImg: 'https://firebasestorage.googleapis.com/v0/b/bitexercise.appspot.com/o/icons%2Fuser-icon-image-placeholder.jpg?alt=media&token=91d6ca81-42b5-462b-b87a-149343efe460',
         permissionGranted: false,
     };
 
@@ -38,7 +38,7 @@ export default class Icon extends Component {
                 // Get user icon url from firebase
                 currentUserIcon = db.ref('/users/' + firebase.auth().currentUser.uid).on('value', (snapshot) => {
                     let userObj = snapshot.val();
-                    if (userObj.iconUrl != null) {
+                    if (userObj.iconUrl) {
                         this.setState({
                             sourceImg: userObj.iconUrl,
                         });
@@ -139,11 +139,11 @@ export default class Icon extends Component {
 
     // check if user default icon does not exists place a holder icon
     render_Icon() {
-        if (this.state.sourceImg === '') {
-            return (<Image style={styles.userIcon} source={require('../assets/user-icon-image-placeholder.jpg')} />)
-        } else {
+        // if (this.state.sourceImg === '0') {
+        //     return (<Image style={styles.userIcon} source={require('../assets/user-icon-image-placeholder.jpg')} />)
+        // } else {
             return (<Image style={styles.userIcon} source={{ uri: this.state.sourceImg }} />)
-        }
+        // }
     }
 
     render() {

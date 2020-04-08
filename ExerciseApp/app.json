@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Running Around The World",
+    "name": "FitsGo",
     "slug": "ExerciseApp",
     "privacy": "public",
     "sdkVersion": "34.0.0",
@@ -24,9 +24,15 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": true
     },
     "android": {
+      "package": "com.opbitproject.fitsgo",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCk8Ge_26DbfrhHt8oMNYZDG1LMN-96eBM"
+        } 
+      }
     }
   }
 }

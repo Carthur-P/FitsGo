@@ -2,6 +2,9 @@ import React, { Component } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Alert, YellowBox, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import TimeFormatter from 'minutes-seconds-milliseconds';
+import firebase from 'firebase';
+import { db } from '../components/common/config';
+import { duration } from 'moment';
 
 class Workout extends Component {
     constructor(props) {
@@ -18,10 +21,12 @@ class Workout extends Component {
             estimateDistance: 0,
             estimateDuration: 0,
             estimateTarget: '',
+            directonM: 'WALKING'
         };
     }
 
     startTimer = () => {
+        this.props.timerOnCallback(true);
         this.setState({
             timerOn: true,
             mainTimer: this.state.mainTimer,
@@ -41,20 +46,29 @@ class Workout extends Component {
     }
 
     resumeTimer = () => {
-        this.setState({ timerOn: false });
+        this.setState({ timerOn: true });
         clearInterval(this.timer);
         this.setState({ startTime: this.state.mainTimer });
         this.startTimer();
     }
 
     stopTimer = () => {
-        this.setState({ timerOn: false });
+        this.props.timerOnCallback(false);
+        this.setState({ 
+            timerOn: false,
+            startTime: 0, 
+            mainTimer: 0
+         });
         clearInterval(this.timer);
-        this.setState({ startTime: 0, mainTimer: 0 });
     }
-
+K
     setDirectionsMode = (m) => {
         this.props.mapDirectionsModeCallback(m);
+        this.setState({ directonM: m })
+    }
+
+    resetDistanceTravelled = (directionMode, realDuration, calories) => {
+        this.props.resetDistanceTravelled(directionMode, realDuration, calories);
     }
 
     calculateSpeed() {
@@ -64,14 +78,95 @@ class Workout extends Component {
     calculateDistance() {
         let dis = parseFloat(this.props.distanceTravelled).toFixed(3);
         if (dis < 1) {
-            return dis * 1000 + ' m';
+            result = dis * 1000 + ' m';
         } else {
-            return parseFloat(dis).toFixed(2) + ' km';
+            result = parseFloat(dis).toFixed(2) + ' km';
         }
+        return result;
     }
 
-    calculateCalorie() {
+    // MET values ref: December 2004(Reviewed 011 / 09) 2004, University of Colorado Hospital, Denver
+    // http://www.ucdenver.edu/academics/colleges/medicine/sportsmed/cusm_patient_resources/Documents/Estimating%20Energy%20Expenditure.pdf
+    // METS Activity Description
+    // 1.0 Sitting Resting metabolic rate
+    // 4.0 Bicycling<l0 mph, general leisure
+    // 6.0 Bicycling 10-11.9 mph, leisure, slow, light effort
+    // 8.0 Bicycling 12 - 13.9 mph, leisure, moderate effort
+    // 10.0 Bicycling 14 - 15.9 mph, racing, fast, vigorous effort
+    // 12.0 Bicycling 16 - 19 mph, racing / not drafting or > 19 mph drafting, very fast
+    // 16.0 Bicycling > 20 mph, racing, not drafting
+    // 8.0 Running 5 mph(12 min mile)
+    // 9.0 Running 5.2 mph(11.5 min mile)
+    // 10.0 Running 6 mph(10 min mile)
+    // 11 Running 6.7 mph(9 min m mile)
+    // 11.5 Running 7 mph(8.5 min mile)
+    // 12.5 Running 7.5 mph(8 min mile)
+    // 13.5 Running 8 mph(7.5 min mile)
+    // 14.0 Running 8.6 mph(7 min mile)
+    // 15.0 Running 9 mph(6.5 min mile)
+    // 16.0 Running 10 mph(6 min mile)
+    // 18.0 Running 10.9 mph(5.5 min mile)
+    // 15.0 Running Running stairs
+    // 2.5 Walking 2 mph, level slow pace, firm surface
+    // 3.0 Walking 2.5 mph, firm surface
+    // 3.5 Walking 3 mph, level, moderate pace, firm surface
+    // 4.0 Walking 3.5 - 4 mph, level, brisk, firm surface
+    // 4.5 Walking 4.5 mph, level, firm surface, very very brisk
+    // 6.5 Walking race walking
+    getMET(dm, speed) {
+        result = 1;
+        switch (dm) {
+            case 'WALKING':
+                if (speed < 3.2) result = 2.5
+                else if (speed < 4) result = 3
+                else if (speed < 4.8) result = 3.5
+                else if (speed < 6.4) result = 4
+                else if (speed < 7.2) result = 4.5
+                break;
+            case 'BICYCLING':
+                if (speed < 16) result = 4.0
+                else if (speed < 19) result = 6.0
+                else if (speed < 22) result = 8.0
+                else if (speed < 25) result = 10.0
+                else if (speed < 30) result = 12.0
+                else if (speed > 32) result = 16.0
+                break;
+            case 'RUNNING':
+                if (speed < 8) result = 8.0
+                else if (speed < 8.4) result = 9.0
+                else if (speed < 9.6) result = 10.0
+                else if (speed < 10.7) result = 11.0
+                else if (speed < 11.2) result = 11.5
+                else if (speed < 12) result = 12.5
+                else if (speed < 12.8) result = 13.5
+                else if (speed < 13.8) result = 14.0
+                else if (speed < 14.5) result = 15.0
+                else if (speed < 16) result = 16.0
+                else if (speed < 17.5) result = 18.0
+                break;
+        }
+        return result;
+    }
 
+    getWeight() {
+        weight = 0;
+        db.ref('/users/' + firebase.auth().currentUser.uid).on('value', (snapshot) => {
+            let userObj = snapshot.val();
+            if (userObj.weight != null) {
+                weight = userObj.weight;
+            }
+        })
+        return weight;
+    }
+
+    // Formula: (METs * 3.5 * weight(kg) / 200) * duration(min)
+    calculateCalorie() {
+        cal = 0.0;
+        met = this.getMET(this.state.directionMode, this.state.speed);
+        weight = this.getWeight();
+        durationTime = this.state.mainTimer / 1000 / 60;
+        cal = (met * 3.5 * weight / 200) * durationTime;
+        return parseFloat(cal).toFixed(2);
     }
 
     setEstimateInfo = (di, du, ta) => {
@@ -103,7 +198,7 @@ class Workout extends Component {
                     <TouchableOpacity style={styles.workoutmode} onPress={() => {
                         if (!this.state.runOption) {
                             this.setState({ runOption: true, bikeOption: false, walkOption: false });
-                            this.setDirectionsMode('WALKING');
+                            this.setDirectionsMode('RUNNING');
                         }
                     }}>
                         <MaterialCommunityIcons name="run-fast" size={37} color={this.state.runOption ? '#48cfad' : '#000000'} />
@@ -129,8 +224,12 @@ class Workout extends Component {
                     <TouchableOpacity
                         style={styles.startBtnStyle}
                         onPress={() => {
-                            if(!this.props.selectedMarker){
+                            if (!this.props.selectedMarker) {
                                 Alert.alert('Please tap a target marker first');
+                                return false;
+                            }
+                            if (this.getWeight() === '0') {
+                                Alert.alert('Please go profile to enter your weight');
                                 return false;
                             }
                             this.setState({ screenState: 1 });
@@ -149,7 +248,7 @@ class Workout extends Component {
         return (
             <>
                 <View style={{ flex: 1 }}>
-                    <Text style={{ textAlign: 'center', marginTop: 10, height: 100, fontSize: 18 }}>{this.calculateDistance()}</Text>
+                    <Text style={styles.textDistance}>{this.calculateDistance()}</Text>
                 </View>
                 <View style={{ flexDirection: 'row', marginTop: 30 }}>
                     <View style={{ flexDirection: 'column', flex: 2 }}>
@@ -161,7 +260,7 @@ class Workout extends Component {
                         <View style={styles.stats}>
                             <Text>{TimeFormatter(this.state.mainTimer)}</Text>
                             <Text>{this.calculateSpeed()} km/h</Text>
-                            <Text>358 cal</Text>
+                            <Text>{this.calculateCalorie()} cal</Text>
                         </View>
                     </View>
                 </View>
@@ -169,7 +268,7 @@ class Workout extends Component {
                     <TouchableOpacity
                         style={styles.startBtnStyle}
                         onPress={() => {
-                            this.setState({ screenState: 2});
+                            this.setState({ screenState: 2 });
                             this.pauseTimer();
                             this.props.isStartCallback(false);
                         }}
@@ -185,7 +284,7 @@ class Workout extends Component {
         return (
             <>
                 <View style={{ flex: 1 }}>
-                    <Text style={{ textAlign: 'center', marginTop: 10, height: 100, fontSize: 18 }}>{this.calculateDistance()}</Text>
+                    <Text style={styles.textDistance}>{this.calculateDistance()}</Text>
                 </View>
                 <View style={{ flexDirection: 'row', marginTop: 30 }}>
                     <View style={{ flexDirection: 'column', flex: 2 }}>
@@ -197,7 +296,7 @@ class Workout extends Component {
                         <View style={styles.stats}>
                             <Text>{TimeFormatter(this.state.mainTimer)}</Text>
                             <Text>{this.calculateSpeed()} km/h</Text>
-                            <Text>358 cal</Text>
+                            <Text>{this.calculateCalorie()} cal</Text>
                         </View>
                     </View>
                 </View>
@@ -211,8 +310,20 @@ class Workout extends Component {
                                 //body
                                 'Are you sure stop exercise ?',
                                 [
-                                    { text: 'Yes', onPress: () => { this.stopTimer(); this.setState({ screenState: 0 }) } },
-                                    { text: 'No', onPress: () => { this.pauseTimer() }, style: 'cancel' },
+                                    {
+                                        text: 'Yes', onPress: () => {           
+                                            this.stopTimer();
+                                            this.setState({ screenState: 0 });
+                                            this.props.isStartCallback(false);
+                                            this.resetDistanceTravelled(this.state.directonM, this.state.mainTimer, this.calculateCalorie())
+                                        }
+                                    },
+                                    {
+                                        text: 'No', onPress: () => {
+                                            this.pauseTimer();
+                                            this.props.isStartCallback(true);
+                                        }, style: 'cancel'
+                                    },
                                 ],
                                 { cancelable: false }
                                 //clicking out side of alert will not cancel
@@ -225,7 +336,7 @@ class Workout extends Component {
                     <TouchableOpacity
                         style={styles.startBtnColStyle}
                         onPress={() => {
-                            this.setState({ screenState: 1});
+                            this.setState({ screenState: 1 });
                             this.resumeTimer();
                             this.props.isStartCallback(true);
                         }}
@@ -301,6 +412,12 @@ const styles = StyleSheet.create({
         marginBottom: 5,
         fontSize: 16,
         color: '#48cfad'
+    },
+    textDistance: {
+        textAlign: 'center',
+        marginTop: 10,
+        height: 100,
+        fontSize: 18
     }
 });
 

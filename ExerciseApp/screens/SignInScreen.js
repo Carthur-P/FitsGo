@@ -16,7 +16,6 @@ class SignInScreen extends Component {
             email: '',
             password: '',
             error: '',
-            loading: false,
         };
     }
 
@@ -29,7 +28,7 @@ class SignInScreen extends Component {
         }
 
         let reg = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
-        if (reg.test(email) === false) {
+        if (reg.test(email) == false) {
             this.setState({ error: 'Email Address invalid!' });
             return false;
         }
@@ -44,60 +43,36 @@ class SignInScreen extends Component {
             return false;
         }
 
-        this.setState({ error: '', loading: true })
-
         firebase.auth().signInWithEmailAndPassword(email, password)
-            .then(this.onLoginSuccess.bind(this))
-            .catch(this.onLoginFail.bind(this));
+        .then(this.onLoginSuccess.bind(this))
+        .catch(this.onLoginFail.bind(this));
+
+        this.setState({ error: ''})
     }
 
     onGoogleSignIn(googleUser) {
-        // We need to register an Observer on Firebase Auth to make sure auth is initialized.
-        var unsubscribe = firebase.auth().onAuthStateChanged((firebaseUser) => {
-            unsubscribe();
-            // Check if we are already signed-in Firebase with the correct user.
-            if (!this.isUserEqual(googleUser, firebaseUser)) {
-                // Build Firebase credential with the Google ID token.
-                var credential = firebase.auth.GoogleAuthProvider.credential(
-                    googleUser.idToken,
-                    googleUser.accessToken
-                );
-                // Sign in with credential from the Google user.
-                firebase.auth().signInWithCredential(credential)
-                .then((result) => { 
-                    console.log(result);
-                    if(result.additionalUserInfo.isNewUser){
-                        firebase.database().ref('/users/' + result.user.uid).set({
-                            firstName: result.additionalUserInfo.profile.given_name,
-                            lastName: result.additionalUserInfo.profile.family_name,
-                            iconURL: result.additionalUserInfo.profile.picture,
-                            email: result.additionalUserInfo.profile.email
-                        });
-                    }
-                    this.onLoginSuccess(); 
-                })
-                .catch(function (error) {
-                    console.log(error);
-                    this.onLoginFail();
+        var credential = firebase.auth.GoogleAuthProvider.credential(
+            googleUser.idToken,
+            googleUser.accessToken
+        );
+        // Sign in with credential from the Google user.
+        firebase.auth().signInWithCredential(credential)
+        .then((result) => { 
+            if(result.additionalUserInfo.isNewUser){
+                firebase.database().ref('/users/' + result.user.uid).set({
+                    firstName: result.additionalUserInfo.profile.given_name,
+                    lastName: result.additionalUserInfo.profile.family_name,
+                    gender : 'Male',
+                    iconUrl: result.additionalUserInfo.profile.picture,
+                    weight: 0
                 });
-            } else {
-                this.onLoginSuccess();
-            }
-        }).bind(this);
-    }
-
-    isUserEqual(googleUser, firebaseUser) {
-        if (firebaseUser) {
-            var providerData = firebaseUser.providerData;
-            for (var i = 0; i < providerData.length; i++) {
-                if (providerData[i].providerId === firebase.auth.GoogleAuthProvider.PROVIDER_ID &&
-                    providerData[i].uid === googleUser.user.id) {
-                    // We don't need to reauth the Firebase connection.
-                    return true;
-                }
-            }
-        }
-        return false;
+                this.props.navigation.navigate('Loading', { newUser: true });
+            } 
+        })
+        .catch((error) => { 
+            console.log(error);
+            this.onLoginFail();
+        });
     }
 
     async onGoogleButtonPress() {
@@ -118,28 +93,36 @@ class SignInScreen extends Component {
         }
     }
 
+    isUserEqual(googleUser, firebaseUser) {
+        if (firebaseUser) {
+          var providerData = firebaseUser.providerData;
+          for (var i = 0; i < providerData.length; i++) {
+            if (providerData[i].providerId === firebase.auth.GoogleAuthProvider.PROVIDER_ID &&
+                providerData[i].uid === googleUser.user.id) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
     onLoginFail() {
         this.setState({
-            loading: false,
-            error: 'Authentication Failed.',
+            error: 'Authentication Failed.'
         });
+        this.props.navigation.navigate('SignUp')
     }
 
     onLoginSuccess() {
         this.setState({
             email: '',
             password: '',
-            loading: false,
             error: '',
         });
         this.props.navigation.navigate('Home');
     }
 
     renderButton() {
-        if (this.state.loading) {
-            return <Spinner size="large" />;
-        }
-
         return (
             <CardSection>
                 <MyButton onPress={this.onButtonPress.bind(this)}>Log in</MyButton>
@@ -148,35 +131,10 @@ class SignInScreen extends Component {
         );
     }
 
-    onResetPasswordPress = () => {
-        const { email } = this.state;
-        if (email.trim() == '') {
-            this.setState({ error: 'Please type Email address!' });
-            return false;
-        }
-
-        let reg = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
-        if (reg.test(email) === false) {
-            this.setState({ error: 'Email Address invalid!' });
-            return false;
-        }
-
-        this.setState({ error: '' })
-
-        firebase.auth().sendPasswordResetEmail(email)
-            .then(() => {
-                Alert.alert("Password reset email has been sent.");
-                this.props.navigation.navigate('SignIn');
-            }, (error) => {
-                Alert.alert(error.message);
-            });
-    }
-
     render() {
         return (
             <View>
                 <Header
-                    // leftComponent={<AntDesign name="arrowleft" onPress={() => this.props.navigation.goBack()} size={32} color="white" />}
                     centerComponent={{ text: "Sign In", style: { color: '#FFF', fontSize: 25 } }} />
                 <Card>
                     <CardSection>
@@ -198,15 +156,15 @@ class SignInScreen extends Component {
                         >
                         </Input>
                     </CardSection>
-                    {this.state.error ? <Text style={styles.errorTextStyle}>{this.state.error}</Text> : null}
-                    {this.renderButton()}
+                        {this.state.error ? <Text style={styles.errorTextStyle}>{this.state.error}</Text> : null}
+                        {this.renderButton()}
                     <CardSection >
                         <TouchableOpacity style={styles.signUpContainer} onPress={() => this.props.navigation.navigate('SignUp')}>
                             <Text style={{ marginVertical: 15 }}>Don't have an Account?  <Text style={{ color: 'blue' }}>Sign up</Text></Text>
                         </TouchableOpacity>
                     </CardSection>
                     <CardSection >
-                        <TouchableOpacity style={styles.signUpContainer} onPress={() => this.onResetPasswordPress()}>
+                        <TouchableOpacity style={styles.signUpContainer} onPress={() => this.props.navigation.navigate('ResetPassword')}>
                             <Text style={{ marginVertical: 15 }}>Forget password?  <Text style={{ color: 'blue' }}>Reset</Text></Text>
                         </TouchableOpacity>
                     </CardSection>
