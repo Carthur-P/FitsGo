@@ -7,7 +7,7 @@ This is a mobile application that aims to help get people to start exercising. T
 
 _(Future update) -_ Friends connectivity, connect with your friends to show off or encourage your friends by showing your exercising records and accomplishment. Also weekly challenges!!
 
-<img src='https://github.com/Carthur-P/FitsGo/blob/master/Resources/showcase.gif' width='442' height='922'>
+<img src='Resources/showcase.gif' width='442' height='922'>
 
 ## How to use it
 
